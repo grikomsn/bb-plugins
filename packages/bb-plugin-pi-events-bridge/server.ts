@@ -139,7 +139,10 @@ export default async function plugin(bb: BbPluginApi) {
       type: "select",
       label: "Ring buffer capacity (events per session)",
       options: ["100", "500", "1000", "5000"],
-      default: "500",
+      // Default 5000: busy sessions (heavy message_update/tool_execution
+      // streams) can exceed 500 events per poll cycle and evict lifecycle
+      // events (e.g. subagents:created/started) before consumers fetch them.
+      default: "5000",
     },
     /** Optional shared secret; if set, the pi side must send `BB_BRIDGE_TOKEN=<value>`.
      * Empty (the default) means an auto-generated token is used. */
