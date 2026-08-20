@@ -224,6 +224,41 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   // ─── Helpers: mutate fleet state from one event ──────────────────────
+  // Apply an event, creating a placeholder record first when a lifecycle
+  // event (started/completed/failed/steered/compacted) arrives before
+  // `created` — pi-subagents can emit `started` before `created`.
+  function ensureSubagentRecord(
+    id: string,
+    event: z.infer<typeof BridgeEventSchema>,
+  ): Subagent | null {
+    let sub = state.byId.get(id);
+    if (sub) return sub;
+    const p = (event.payload ?? {}) as Record<string, unknown>;
+    sub = {
+      id,
+      parentSessionId: event.sessionId ?? null,
+      type: typeof p.type === "string" ? p.type : "general-purpose",
+      prompt: typeof p.prompt === "string" ? p.prompt : (typeof p.description === "string" ? p.description : ""),
+      model: typeof p.model === "string" ? p.model : null,
+      runInBackground: p.runInBackground === true || p.isBackground === true,
+      status: "starting",
+      createdAt: event.ts,
+      startedAt: null,
+      completedAt: null,
+      failureReason: null,
+      steerCount: 0,
+      result: null,
+    };
+    state.byId.set(id, sub);
+    state.order.push(id);
+    if (!state.byParent.has(sub.parentSessionId ?? "_")) {
+      state.byParent.set(sub.parentSessionId ?? "_", new Set());
+    }
+    state.byParent.get(sub.parentSessionId ?? "_")!.add(id);
+    evictIfNeeded();
+    return sub;
+  }
+
   function applyEvent(event: z.infer<typeof BridgeEventSchema>): void {
     const p = (event.payload ?? {}) as Record<string, unknown>;
     const id = typeof p.id === "string" ? p.id : null;
@@ -233,40 +268,18 @@ export default async function plugin(bb: BbPluginApi) {
     switch (event.type) {
       case "pi.ext:subagents:created":
       case "pi.ext:subagents:scheduled": {
-        if (state.byId.has(id)) return;
-        const sub: Subagent = {
-          id,
-          parentSessionId,
-          type: typeof p.type === "string" ? p.type : "general-purpose",
-          prompt: typeof p.prompt === "string" ? p.prompt : "",
-          model: typeof p.model === "string" ? p.model : null,
-          runInBackground: p.runInBackground === true,
-          status: "starting",
-          createdAt: event.ts,
-          startedAt: null,
-          completedAt: null,
-          failureReason: null,
-          steerCount: 0,
-          result: null,
-        };
-        state.byId.set(id, sub);
-        state.order.push(id);
-        if (!state.byParent.has(parentSessionId ?? "_")) {
-          state.byParent.set(parentSessionId ?? "_", new Set());
-        }
-        state.byParent.get(parentSessionId ?? "_")!.add(id);
-        evictIfNeeded();
+        ensureSubagentRecord(id, event);
         break;
       }
       case "pi.ext:subagents:started": {
-        const sub = state.byId.get(id);
+        const sub = ensureSubagentRecord(id, event);
         if (!sub) return;
         sub.status = "running";
         sub.startedAt = event.ts;
         break;
       }
       case "pi.ext:subagents:completed": {
-        const sub = state.byId.get(id);
+        const sub = ensureSubagentRecord(id, event);
         if (!sub) return;
         sub.status = "completed";
         sub.completedAt = event.ts;
@@ -274,7 +287,7 @@ export default async function plugin(bb: BbPluginApi) {
         break;
       }
       case "pi.ext:subagents:failed": {
-        const sub = state.byId.get(id);
+        const sub = ensureSubagentRecord(id, event);
         if (!sub) return;
         sub.status = "failed";
         sub.completedAt = event.ts;
@@ -282,7 +295,7 @@ export default async function plugin(bb: BbPluginApi) {
         break;
       }
       case "pi.ext:subagents:steered": {
-        const sub = state.byId.get(id);
+        const sub = ensureSubagentRecord(id, event);
         if (!sub) return;
         sub.steerCount += 1;
         sub.status = "steered";
@@ -291,7 +304,7 @@ export default async function plugin(bb: BbPluginApi) {
         break;
       }
       case "pi.ext:subagents:compacted": {
-        const sub = state.byId.get(id);
+        const sub = ensureSubagentRecord(id, event);
         if (!sub) return;
         sub.status = "compacted";
         break;
@@ -455,15 +468,16 @@ export default async function plugin(bb: BbPluginApi) {
       } catch (err) {
         bb.log.debug(`threadSession lookup failed: ${String(err)}`);
       }
-      if (!providerSessionId) {
-        return { threadId, providerSessionId: null, subagents: [] };
-      }
+      // For pi, the session file is named by the bb thread id, so when the
+      // chokepoint has no mapping (e.g. threads active before it loaded), the
+      // thread id IS the session id.
+      const sessionId = providerSessionId ?? threadId;
       const subagents = listSubagents("active").filter(
-        (s) => s.parentSessionId === providerSessionId,
+        (s) => s.parentSessionId === sessionId,
       );
       return {
         threadId,
-        providerSessionId,
+        providerSessionId: sessionId,
         subagents: subagents.map((s) => ({
           id: s.id,
           parentSessionId: s.parentSessionId,

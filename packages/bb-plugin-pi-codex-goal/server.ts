@@ -384,11 +384,12 @@ export default async function plugin(bb: BbPluginApi) {
       } catch (err) {
         bb.log.debug(`threadSession lookup failed: ${String(err)}`);
       }
-      if (!providerSessionId) {
-        return { threadId, providerSessionId: null, snapshot: null };
-      }
-      const snap = snapshots.get(providerSessionId) ?? null;
-      return { threadId, providerSessionId, snapshot: snap };
+      // For pi, the session file is named by the bb thread id, so when the
+      // chokepoint has no mapping (e.g. threads active before it loaded), the
+      // thread id IS the session id.
+      const sessionId = providerSessionId ?? threadId;
+      const snap = snapshots.get(sessionId) ?? null;
+      return { threadId, providerSessionId: sessionId, snapshot: snap };
     },
   });
 

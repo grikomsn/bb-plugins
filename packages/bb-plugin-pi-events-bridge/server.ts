@@ -426,7 +426,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   // HTTP route: /events -> recent ring-buffer events (debug only).
   bb.http.route("GET", "/events", () => {
-    const out: Array<{ seq: number; ts: string; type: string; sessionId: string | null; cwd: string }> = [];
+    const out: Array<{ seq: number; ts: string; type: string; sessionId: string | null; cwd: string; payload?: unknown }> = [];
     for (const [, ring] of rings) {
       for (const ev of ring.events) {
         out.push({
@@ -435,6 +435,7 @@ export default async function plugin(bb: BbPluginApi) {
           type: ev.type,
           sessionId: ev.sessionId ?? null,
           cwd: ev.cwd,
+          payload: ev.payload,
         });
       }
     }
