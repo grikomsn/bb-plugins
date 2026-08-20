@@ -1,0 +1,27 @@
+{
+  "name": "bb-plugin-pi-subagents-fleet",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.39",
+    "bbPluginSdk": ">=0.4.8"
+  },
+  "bb": {
+    "name": "Pi Subagents Fleet",
+    "description": "Live fleet view of @tintinweb/pi-subagents sub-agents (created/started/completed/failed/steered). Re-emits each sub-agent on bb realtime via bb-plugin-pi-events-bridge; renders one card per active sub-agent with a ThreadChat for its conversation.",
+    "branding": {
+      "icon": "Users"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "./skills"
+    ]
+  },
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build .",
+    "dev": "bb plugin dev ."
+  }
+}

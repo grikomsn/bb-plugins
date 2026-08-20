@@ -1,0 +1,27 @@
+{
+  "name": "bb-plugin-pi-codex-goal",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.39",
+    "bbPluginSdk": ">=0.4.8"
+  },
+  "bb": {
+    "name": "Pi Codex Goal",
+    "description": "Renders the active pi-codex-goal state (objective, status, token usage, history count) as a composer banner + nav panel history view. Built on bb-plugin-pi-events-bridge; reads synthesized `pi.ext:codex-goal/state` events derived from pi-codex-goal CustomEntry rows.",
+    "branding": {
+      "icon": "Target"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "./skills"
+    ]
+  },
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build .",
+    "dev": "bb plugin dev ."
+  }
+}

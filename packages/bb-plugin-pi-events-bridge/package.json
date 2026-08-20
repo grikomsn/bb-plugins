@@ -1,0 +1,27 @@
+{
+  "name": "bb-plugin-pi-events-bridge",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.39",
+    "bbPluginSdk": ">=0.4.8"
+  },
+  "bb": {
+    "name": "Pi Events Bridge",
+    "description": "Forward pi extension events (lifecycle + 3rd-party plugins like pi-subagents, plannotator, pi-mcp-adapter, pi-unified-exec) over a Unix socket into bb realtime. Companion to the pi-bb-bridge pi extension.",
+    "branding": {
+      "icon": "Radio"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "./skills"
+    ]
+  },
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build .",
+    "dev": "bb plugin dev ."
+  }
+}

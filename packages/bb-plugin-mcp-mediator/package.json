@@ -1,0 +1,27 @@
+{
+  "name": "bb-plugin-mcp-mediator",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.39",
+    "bbPluginSdk": ">=0.4.8"
+  },
+  "bb": {
+    "name": "Pi MCP Mediator",
+    "description": "Mediates pi-mcp-adapter approval requests and status snapshots via bb-plugin-pi-events-bridge. Surfaces MCP server status, mediates tool-approval prompts through bb.ui.requestInput.",
+    "branding": {
+      "icon": "ShieldCheck"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "./skills"
+    ]
+  },
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build .",
+    "dev": "bb plugin dev ."
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "pi-bb-bridge",
+  "version": "0.1.0",
+  "description": "Pi extension that forwards lifecycle and third-party plugin events to a bb-side consumer over a Unix socket. Companion to bb-plugin-pi-events-bridge.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
