@@ -424,6 +424,24 @@ export default async function plugin(bb: BbPluginApi) {
     return Response.json({ ok: true, count: entries.length, entries });
   });
 
+  // HTTP route: /events -> recent ring-buffer events (debug only).
+  bb.http.route("GET", "/events", () => {
+    const out: Array<{ seq: number; ts: string; type: string; sessionId: string | null; cwd: string }> = [];
+    for (const [, ring] of rings) {
+      for (const ev of ring.events) {
+        out.push({
+          seq: ev.seq,
+          ts: ev.ts,
+          type: ev.type,
+          sessionId: ev.sessionId ?? null,
+          cwd: ev.cwd,
+        });
+      }
+    }
+    out.sort((a, b) => a.seq - b.seq);
+    return Response.json({ ok: true, count: out.length, events: out.slice(-500) });
+  });
+
   // HTTP route: /status -> live chokepoint state (debug only).
   bb.http.route("GET", "/status", () => {
     return Response.json({

@@ -114,6 +114,21 @@ pi → chokepoint → consumer path.
   `turn_start`, `turn_end`, and `agent_settled`, and synthesized into
   `pi.ext:codex-goal/entry` + `pi.ext:codex-goal/state` envelopes (deduped by
   entry fingerprint).
+- **In-process subagent sessions**: pi-subagents runs subagent sessions in the
+  same process (`runInChildSessionContext`), so the extension factory runs once
+  per session. Session id lives in the install closure (per-session) and the
+  socket is shared — the first install performs the hello+connect, later
+  installs reuse it. This keeps the parent thread's events (including
+  `subagents:completed`) tagged to the parent instead of being orphaned or
+  mis-tagged with the subagent's id.
+- **Per-session seq watermarks**: each pi process numbers events from 1, so the
+  consumer plugins (`pi-codex-goal`, `pi-subagents-fleet`, `mcp-mediator`) track
+  `lastPolledSeq` per session, not globally — a global watermark silently
+  skipped every new session's events.
+- **Unhandled raw SDK events**: the extension now also forwards
+  `message_start/update`, `tool_execution_start/update/end`,
+  `before/after_provider_request/response`, `user_bash`, and `input` as
+  `pi.lifecycle:*`, so those raw types no longer need bb-side translation.
 
 ## Also fixed: socket-reload race
 

@@ -207,7 +207,10 @@ export default async function plugin(bb: BbPluginApi) {
   type SessionKey = string;
   const snapshots = new Map<SessionKey, GoalSnapshot>();
   const histories = new Map<SessionKey, HistoryEntry[]>();
-  let lastPolledSeq: number | null = null;
+  // Per-session seq watermarks. Each pi process numbers its events from 1
+  // (parent thread, subagents, later threads), so a single global watermark
+  // would silently skip every new session's events.
+  const lastPolledSeqBySession = new Map<string, number>();
 
   function keyOf(sessionId: string | null | undefined): SessionKey {
     return sessionId ?? "_";
@@ -297,11 +300,14 @@ export default async function plugin(bb: BbPluginApi) {
       });
       const out: z.infer<typeof BridgeEventSchema>[] = [];
       for (const e of result.events) {
-        if (lastPolledSeq === null || e.seq > lastPolledSeq) out.push(e);
+        const key = e.sessionId ?? "_";
+        const last = lastPolledSeqBySession.get(key);
+        if (last === undefined || e.seq > last) out.push(e);
       }
       out.reverse();
-      if (out.length > 0) {
-        lastPolledSeq = Math.max(lastPolledSeq ?? -1, ...out.map((e) => e.seq));
+      for (const e of out) {
+        const key = e.sessionId ?? "_";
+        lastPolledSeqBySession.set(key, Math.max(lastPolledSeqBySession.get(key) ?? -1, e.seq));
       }
       return out;
     } catch (err) {

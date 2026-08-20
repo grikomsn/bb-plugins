@@ -144,7 +144,7 @@ function handleInbound(line: string, sock: net.Socket): void {
           ts: new Date().toISOString(),
           type: "bb.bridge:command-ack",
           cwd: CWD,
-          sessionId: currentSessionId,
+          sessionId: lastSessionId,
           payload: { command, id, ok: false, error: "no active pi session" },
         }) + "\n",
       );
@@ -183,7 +183,7 @@ function handleInbound(line: string, sock: net.Socket): void {
           ts: new Date().toISOString(),
           type: "bb.bridge:command-ack",
           cwd: CWD,
-          sessionId: currentSessionId,
+          sessionId: lastSessionId,
           payload: { command, id, ...replyPayload },
         }) + "\n",
       );
@@ -204,7 +204,7 @@ function handleInbound(line: string, sock: net.Socket): void {
           ts: new Date().toISOString(),
           type: "bb.bridge:command-ack",
           cwd: CWD,
-          sessionId: currentSessionId,
+          sessionId: lastSessionId,
           payload: { command, id, ok: false, error: "timeout" },
         }) + "\n",
       );
@@ -239,22 +239,27 @@ function emit(type: string, payload: unknown, sessionId?: string): void {
 }
 
 // ─── Session id helper ──────────────────────────────────────────────────
+// NOTE: pi-subagents runs subagent sessions in-process (runInChildSessionContext
+// -> createAgentSession), so this extension's factory runs once per session in
+// the SAME process. Session id therefore lives in the install closure (one per
+// session), and the socket is shared — a new install must NOT create a second
+// connection or it orphans the parent's events (and mis-tags them with the
+// subagent's session id). `lastSessionId` is only for bb->pi command acks.
 
-let currentSessionId: string | undefined;
+let lastSessionId: string | undefined;
 
-function captureSessionId(ctx: { sessionManager?: { getSessionFile?: () => unknown } }): void {
+function captureSessionId(ctx: {
+  sessionManager?: { getSessionFile?: () => unknown };
+}): string | undefined {
   try {
     const file = ctx.sessionManager?.getSessionFile?.();
     if (typeof file === "string" && file.length > 0) {
-      currentSessionId = file.split("/").pop()?.replace(/\.jsonl$/, "");
+      return file.split("/").pop()?.replace(/\.jsonl$/, "");
     }
   } catch {
     // ignore
   }
-}
-
-function emitWithSession(type: string, payload: unknown): void {
-  emit(type, asPayload(payload), currentSessionId);
+  return undefined;
 }
 
 function asPayload(p: unknown): Record<string, unknown> {
@@ -271,19 +276,33 @@ export default function (pi: ExtensionAPI) {
 
   activePi = pi;
 
-  // Auth handshake: the very first line carries the shared token (if set).
-  // The bb-side consumer verifies it before trusting any subsequent events.
-  if (TOKEN) {
-    emit("bb.bridge:hello", { token: TOKEN, pid: process.pid, host: os.hostname() });
-  } else {
-    emit("bb.bridge:hello", { pid: process.pid, host: os.hostname() });
+  // Per-session state: this install closure belongs to one pi session (the
+  // parent thread, or a subagent session created in-process by pi-subagents).
+  let sessionId: string | undefined;
+  function emitWithSession(type: string, payload: unknown): void {
+    emit(type, asPayload(payload), sessionId);
+  }
+  function captureMySessionId(ctx: unknown): void {
+    const id = captureSessionId(ctx as Parameters<typeof captureSessionId>[0]);
+    if (id) sessionId = id;
+    if (id) lastSessionId = id;
   }
 
-  connect();
+  // The socket is SHARED across sessions in this process. Only the first
+  // install performs the auth handshake + connect; later installs (subagent
+  // sessions) just re-point activePi and reuse the live connection.
+  if (!socket && !shuttingDown) {
+    if (TOKEN) {
+      emit("bb.bridge:hello", { token: TOKEN, pid: process.pid, host: os.hostname() });
+    } else {
+      emit("bb.bridge:hello", { pid: process.pid, host: os.hostname() });
+    }
+    connect();
+  }
 
   // ─── Session lifecycle ────────────────────────────────────────────────
   pi.on("session_start", async (event, ctx) => {
-    captureSessionId(ctx);
+    captureMySessionId(ctx);
     emitWithSession("pi.lifecycle:session_start", {
       reason: event?.reason,
       cwd: ctx.cwd,
@@ -305,6 +324,8 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_shutdown", async (event) => {
     emitWithSession("pi.lifecycle:session_shutdown", { reason: event?.reason });
+    // Do NOT end the shared socket here: subagent sessions shut down while
+    // the parent session is still live. The process exit closes the socket.
   });
 
   pi.on("session_info_changed", (event) => {
@@ -397,6 +418,90 @@ export default function (pi: ExtensionAPI) {
       role: m.role,
       stopReason: (m as { stopReason?: string }).stopReason,
       usage: (m as { usage?: unknown }).usage,
+    });
+  });
+
+  // Messages that bb provider-pi does not translate (leaked as
+  // `provider/unhandled` in bb.db) — surface them so nothing is lost.
+  pi.on("message_start", (event) => {
+    const m = (event?.message ?? {}) as unknown as Record<string, unknown>;
+    emitWithSession("pi.lifecycle:message_start", {
+      role: typeof m.role === "string" ? m.role : undefined,
+      id: typeof m.id === "string" ? m.id : undefined,
+      model: typeof m.model === "string" ? m.model : undefined,
+    });
+  });
+
+  pi.on("message_update", (event) => {
+    const m = (event?.message ?? {}) as unknown as Record<string, unknown>;
+    emitWithSession("pi.lifecycle:message_update", {
+      id: typeof m.id === "string" ? m.id : undefined,
+      role: typeof m.role === "string" ? m.role : undefined,
+    });
+  });
+
+  // Tool execution lifecycle (distinct from tool_call/tool_result).
+  pi.on("tool_execution_start", (event) => {
+    const args = event?.args;
+    emitWithSession("pi.lifecycle:tool_execution_start", {
+      toolName: event?.toolName,
+      toolCallId: event?.toolCallId,
+      argKeys: args && typeof args === "object" ? Object.keys(args as object) : [],
+    });
+  });
+
+  pi.on("tool_execution_update", (event) => {
+    emitWithSession("pi.lifecycle:tool_execution_update", {
+      toolName: event?.toolName,
+      toolCallId: event?.toolCallId,
+    });
+  });
+
+  pi.on("tool_execution_end", (event) => {
+    const result = event?.result;
+    emitWithSession("pi.lifecycle:tool_execution_end", {
+      toolName: event?.toolName,
+      toolCallId: event?.toolCallId,
+      isError: event?.isError,
+      resultIsError: Boolean(
+        result && typeof result === "object" && (result as { isError?: unknown }).isError,
+      ),
+      contentLen:
+        Array.isArray(result && typeof result === "object" && (result as { content?: unknown }).content)
+          ? (result as { content: Array<{ text?: string }> }).content.reduce(
+              (n: number, c: { text?: string }) => n + (typeof c?.text === "string" ? c.text.length : 0),
+              0,
+            )
+          : undefined,
+    });
+  });
+
+  // Provider request/response lifecycle + user input surfaces.
+  pi.on("before_provider_request", (event) => {
+    const p = (event?.payload ?? {}) as Record<string, unknown>;
+    emitWithSession("pi.lifecycle:before_provider_request", {
+      model: typeof p.model === "string" ? p.model : undefined,
+      provider: p.model && typeof p.model === "object" ? (p.model as { provider?: unknown }).provider : undefined,
+    });
+  });
+
+  pi.on("after_provider_response", (event) => {
+    emitWithSession("pi.lifecycle:after_provider_response", {
+      status: event?.status,
+    });
+  });
+
+  pi.on("user_bash", (event) => {
+    emitWithSession("pi.lifecycle:user_bash", {
+      command: event?.command,
+      excludeFromContext: event?.excludeFromContext,
+    });
+  });
+
+  pi.on("input", (event) => {
+    emitWithSession("pi.lifecycle:input", {
+      textLen: typeof event?.text === "string" ? event.text.length : undefined,
+      hasImages: Array.isArray(event?.images) ? event.images.length > 0 : undefined,
     });
   });
 
@@ -843,9 +948,9 @@ export default function (pi: ExtensionAPI) {
   forwardExtEvent("unified-exec:session-output");
 
   // ─── Shutdown ─────────────────────────────────────────────────────────
-  pi.on("session_shutdown", async () => {
-    shuttingDown = true;
-    if (reconnectTimer) clearTimeout(reconnectTimer);
-    if (socket && !socket.destroyed) socket.end();
-  });
+  // NOTE: there is deliberately no cleanup in a second `session_shutdown`
+  // handler here — subagent sessions shut down while the parent session is
+  // still live, and ending the shared socket would drop the parent's events.
+  // The process exit closes the socket; reconnect-on-close keeps it alive
+  // for as long as the process runs.
 }

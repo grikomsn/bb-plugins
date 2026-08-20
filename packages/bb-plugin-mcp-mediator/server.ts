@@ -126,7 +126,8 @@ export default async function plugin(bb: BbPluginApi) {
   const servers = new Map<string, ServerEntry>();
   const pending = new Map<string, PendingApproval>();
   let lastSnapshotAt: string | null = null;
-  let lastPolledSeq: number | null = null;
+  // Per-session seq watermarks (each pi process numbers events from 1).
+  const lastPolledSeqBySession = new Map<string, number>();
 
   // ─── Poll the chokepoint for MCP events ──────────────────────────────
   async function fetchNewEvents(): Promise<z.infer<typeof BridgeEventSchema>[]> {
@@ -140,11 +141,14 @@ export default async function plugin(bb: BbPluginApi) {
       });
       const out: z.infer<typeof BridgeEventSchema>[] = [];
       for (const e of result.events) {
-        if (lastPolledSeq === null || e.seq > lastPolledSeq) out.push(e);
+        const key = e.sessionId ?? "_";
+        const last = lastPolledSeqBySession.get(key);
+        if (last === undefined || e.seq > last) out.push(e);
       }
       out.reverse();
-      if (out.length > 0) {
-        lastPolledSeq = Math.max(lastPolledSeq ?? -1, ...out.map((e) => e.seq));
+      for (const e of out) {
+        const key = e.sessionId ?? "_";
+        lastPolledSeqBySession.set(key, Math.max(lastPolledSeqBySession.get(key) ?? -1, e.seq));
       }
       bb.log.debug(
         `recent returned ${result.events.length} events, ${out.length} new`,
