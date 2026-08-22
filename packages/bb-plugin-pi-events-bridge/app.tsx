@@ -251,17 +251,18 @@ function EventsPanel() {
 }
 
 export default definePluginApp((app) => {
-  app.slots.navPanel({
-    id: "pi-events",
-    title: "Pi Events",
-    icon: "Radio",
-    path: "pi-events",
+  // The Pi Events Bridge is diagnostic / configuration tooling — it has no
+  // day-to-day UI surface. Hosts surface it as a plugin settings section so
+  // the bb main sidebar stays reserved for active work.
+  app.slots.settingsSection({
+    id: "pi-events-bridge",
+    title: "Pi Events Bridge",
+    description:
+      "Live status of the bridge socket plus the raw pi lifecycle / 3rd-party plugin event stream. Use this to debug why a downstream plugin (subagents fleet, codex-goal, …) is not seeing the events you expect.",
     component: () => (
-      <div className="space-y-4 p-4 md:p-5">
-        <div className="mx-auto w-full max-w-3xl space-y-4">
-          <StatusCard />
-          <EventsPanel />
-        </div>
+      <div className="space-y-4">
+        <StatusCard />
+        <EventsPanel />
       </div>
     ),
   });

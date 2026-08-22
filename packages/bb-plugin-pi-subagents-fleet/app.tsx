@@ -17,6 +17,7 @@ import {
   useBbNavigate,
   useRealtime,
   useRpc,
+  useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./server";
 import { Button } from "@/components/ui/button";
@@ -181,6 +182,40 @@ function FleetHeader({
   );
 }
 
+/**
+ * Small read-only summary of the effective plugin settings. The host renders
+ * the edit form for these descriptors in the bb Settings page; this panel
+ * exists so you can verify what's actually in effect without leaving the
+ * fleet view.
+ */
+function FleetDiagnostics() {
+  const settings = useSettings();
+  const maxRetained =
+    typeof settings.values?.maxRetained === "string"
+      ? settings.values.maxRetained
+      : "500";
+  const typeFilter =
+    typeof settings.values?.typeFilter === "string" &&
+    settings.values.typeFilter.length > 0
+      ? settings.values.typeFilter
+      : "all";
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+      <span>
+        Polling pi-events-bridge every{" "}
+        <span className="font-mono">1000ms</span>
+      </span>
+      <span>
+        Max retained: <span className="font-mono">{maxRetained}</span>
+      </span>
+      <span>
+        Type filter: <span className="font-mono">{typeFilter}</span>
+      </span>
+      {settings.isLoading ? <span>• loading settings…</span> : null}
+    </div>
+  );
+}
+
 function Fleet() {
   const rpc = useRpc<typeof rpcContract>();
   const [result, setResult] = useState<FleetResult | null>(null);
@@ -242,25 +277,31 @@ function Fleet() {
   }
 
   return (
-    <FleetHeader
-      result={result}
-      onSteer={(id) => void onSteer(id)}
-      onStop={(id) => void onStop(id)}
-    />
+    <div className="space-y-4">
+      <FleetHeader
+        result={result}
+        onSteer={(id) => void onSteer(id)}
+        onStop={(id) => void onStop(id)}
+      />
+      <FleetDiagnostics />
+    </div>
   );
 }
 
 export default definePluginApp((app) => {
-  app.slots.navPanel({
+  // The fleet view is moved out of the main sidebar (it's an inspection
+  // surface for the sub-agents currently running across pi sessions) and
+  // into the plugin's settings page. The per-thread header pill + right-side
+  // thread panel action still surface live sub-agent state when something is
+  // happening.
+  app.slots.settingsSection({
     id: "pi-subagents-fleet",
-    title: "Subagents",
-    icon: "Users",
-    path: "subagents",
+    title: "Pi Subagents Fleet",
+    description:
+      "Live view of every sub-agent spawned via the @tintinweb/pi-subagents extension in the connected pi sessions. Use this to steer, stop, and inspect background agents.",
     component: () => (
-      <div className="space-y-4 p-4 md:p-5">
-        <div className="mx-auto w-full max-w-3xl space-y-4">
-          <Fleet />
-        </div>
+      <div className="space-y-4">
+        <Fleet />
       </div>
     ),
   });
@@ -309,11 +350,10 @@ export default definePluginApp((app) => {
         <button
           type="button"
           onClick={() => {
-            const ok = navigate.openThreadPanel({
+            navigate.openThreadPanel({
               actionId: "subagents-overview",
               title: "Subagents",
             });
-            if (!ok) navigate.toPluginPanel("subagents");
           }}
           className={cn(
             "flex items-center gap-1.5 rounded border border-border/60 bg-background/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wide transition-colors hover:bg-muted/60",

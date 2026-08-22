@@ -16,6 +16,11 @@ connected pi session. Built on top of [`bb-plugin-pi-events-bridge`](../bb-plugi
 - **Persists** sub-agent state in-memory with bounded retention (default 500,
   configurable). Completed/failed/compacted sub-agents drop off when retention
   is exceeded; live ones never drop.
+- **Settings section** — the full fleet view (cards + diagnostics strip
+  showing polling cadence, retention cap, and active type filter) lives
+  under this plugin's page in bb's main Settings (no sidebar entry on the
+  bb main rail). The per-thread header pill + right-side thread panel
+  action still surface live agents when something is happening.
 
 ## Install
 

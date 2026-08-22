@@ -20,7 +20,7 @@ cp ../pi-bb-bridge/index.ts ~/.pi/agent/extensions/pi-bb-bridge.ts
 
 The plugin loads immediately; the pi extension is a no-op until
 `BB_BRIDGE_SOCKET_PATH` points at this plugin's socket (the path is shown in
-the plugin's nav panel after install).
+the plugin's settings page after install).
 
 ## What it forwards
 

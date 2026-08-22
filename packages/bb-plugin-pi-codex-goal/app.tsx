@@ -19,6 +19,7 @@ import {
   useBbNavigate,
   useRealtime,
   useRpc,
+  useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./server";
 import { Button } from "@/components/ui/button";
@@ -364,6 +365,39 @@ function GoalPanel() {
           Refresh
         </Button>
       </div>
+      <GoalDiagnostics />
+    </div>
+  );
+}
+
+/**
+ * Small read-only summary of the effective plugin settings. The host renders
+ * the edit form for these descriptors in the bb Settings page; this panel
+ * exists so you can verify what's actually in effect without leaving the
+ * goal view.
+ */
+function GoalDiagnostics() {
+  const settings = useSettings();
+  const alwaysShowBanner = settings.values?.alwaysShowBanner;
+  const emitOnClear = settings.values?.emitOnClear;
+  function fmt(v: unknown): string {
+    if (typeof v === "boolean") return v ? "on" : "off";
+    if (typeof v === "string" && v.length > 0) return v;
+    return "default";
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+      <span>
+        Polling every <span className="font-mono">2000ms</span>
+      </span>
+      <span>
+        alwaysShowBanner:{" "}
+        <span className="font-mono">{fmt(alwaysShowBanner)}</span>
+      </span>
+      <span>
+        emitOnClear: <span className="font-mono">{fmt(emitOnClear)}</span>
+      </span>
+      {settings.isLoading ? <span>• loading settings…</span> : null}
     </div>
   );
 }
@@ -393,16 +427,18 @@ function BudgetBar({ goal }: { goal: Goal }) {
 }
 
 export default definePluginApp((app) => {
-  app.slots.navPanel({
+  // The goal panel is moved out of the main sidebar (it's a diagnostic /
+  // inspection surface, not day-to-day UI) and into the plugin's settings
+  // page. The per-thread header pill + right-side thread panel action still
+  // give one-click access when a goal is actively running.
+  app.slots.settingsSection({
     id: "pi-codex-goal",
-    title: "Goals",
-    icon: "Target",
-    path: "codex-goal",
+    title: "Pi Codex Goal",
+    description:
+      "Active goal state, history, and all-session overview for the pi-codex-goal extension. Use this to inspect token usage, review the history of goal entries, and verify which pi sessions are reporting goal state.",
     component: () => (
-      <div className="space-y-4 p-4 md:p-5">
-        <div className="mx-auto w-full max-w-3xl space-y-4">
-          <GoalPanel />
-        </div>
+      <div className="space-y-4">
+        <GoalPanel />
       </div>
     ),
   });
@@ -447,14 +483,10 @@ export default definePluginApp((app) => {
         <button
           type="button"
           onClick={() => {
-            const ok = navigate.openThreadPanel({
+            navigate.openThreadPanel({
               actionId: "codex-goal-overview",
               title: "Goals",
             });
-            if (!ok) {
-              // Fall back to the nav panel when no side panel is available.
-              navigate.toPluginPanel("codex-goal");
-            }
           }}
           className={cn(
             "flex items-center gap-1.5 rounded border border-border/60 bg-background/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wide transition-colors hover:bg-muted/60",

@@ -28,8 +28,11 @@ socket. This plugin consumes them.
   and live token count.
 - **All sessions** — when multiple pi sessions report goal state, list
   each one with its own status.
+- **Settings section** — the full state above lives under this plugin's
+  page in bb's main Settings (no sidebar entry on the bb main rail).
 - **Thread header badge** — a compact status pill in the 48px thread
-  header that turns green/amber/orange based on the live status.
+  header, shown only when the goal for the current thread is `active`.
+  Green/amber/orange based on the live status.
 
 ## Install
 
@@ -63,7 +66,7 @@ pi-bb-bridge: context event → walk messages → emit
                        │
                   bb.realtime.publish("pi/codex-goal/snapshot")
                        ▼
-                frontend nav panel + thread header badge
+                frontend settings section + thread header badge
 ```
 
 ## RPC surface
