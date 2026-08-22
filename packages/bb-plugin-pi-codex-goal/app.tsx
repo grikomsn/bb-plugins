@@ -438,7 +438,11 @@ export default definePluginApp((app) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [threadId]);
       const goal = snap?.goal;
-      const tone = goal ? statusTone(goal.status) : "bg-muted text-muted-foreground";
+      // Omit the navbar indicator entirely unless a goal is actively running.
+      // A paused / complete / budgetLimited goal is still represented by its
+      // own panel; we don't need a pill cluttering the header for it.
+      if (!goal || goal.status !== "active") return null;
+      const tone = statusTone(goal.status);
       return (
         <button
           type="button"
@@ -456,21 +460,15 @@ export default definePluginApp((app) => {
             "flex items-center gap-1.5 rounded border border-border/60 bg-background/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wide transition-colors hover:bg-muted/60",
             tone,
           )}
-          title={goal?.objective ?? "no active goal"}
+          title={goal.objective}
         >
           <span aria-hidden="true">🎯</span>
-          {goal ? (
-            <>
-              <span>{goal.status}</span>
-              {goal.tokenBudget ? (
-                <span className="text-muted-foreground">
-                  {Math.round((goal.usage.tokensUsed / goal.tokenBudget) * 100)}%
-                </span>
-              ) : null}
-            </>
-          ) : (
-            <span>no goal</span>
-          )}
+          <span>{goal.status}</span>
+          {goal.tokenBudget ? (
+            <span className="text-muted-foreground">
+              {Math.round((goal.usage.tokensUsed / goal.tokenBudget) * 100)}%
+            </span>
+          ) : null}
         </button>
       );
     },

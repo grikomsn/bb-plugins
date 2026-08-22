@@ -300,7 +300,11 @@ export default definePluginApp((app) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [threadId]);
       const active = result?.subagents ?? [];
-      const tone = active.length > 0 ? "bg-blue-500/15 text-blue-700 dark:text-blue-300" : "bg-muted text-muted-foreground";
+      // Omit the navbar indicator entirely when no sub-agents are running.
+      // Idle state is visible in the side panel; the pill only earns space
+      // when something is actually happening.
+      if (active.length === 0) return null;
+      const tone = "bg-blue-500/15 text-blue-700 dark:text-blue-300";
       return (
         <button
           type="button"
