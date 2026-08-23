@@ -1,0 +1,27 @@
+{
+  "name": "bb-plugin-codex-events-bridge",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.39",
+    "bbPluginSdk": ">=0.4.8"
+  },
+  "bb": {
+    "name": "Codex Events Bridge",
+    "description": "Poll every active codex thread's normalized event log, ring-buffer the rows, and republish them on bb realtime so downstream codex consumer plugins (goal, plan, context, live, raw) can subscribe over a single chokepoint.",
+    "branding": {
+      "icon": "Radio"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "./skills"
+    ]
+  },
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build .",
+    "dev": "bb plugin dev ."
+  }
+}
