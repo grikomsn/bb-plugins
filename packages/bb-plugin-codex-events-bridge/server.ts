@@ -322,9 +322,14 @@ export default async function plugin(bb: BbPluginApi) {
           payload: row.data,
         };
         recordEvent(state, event);
-        const channel = eventToChannel(event.type);
+        const channel = eventToChannel(event.type, event.payload);
         if (channel !== null) {
           bb.realtime.publish(channel, event);
+        }
+        // Preserve the original generic account channel for existing
+        // consumers while also exposing the rawType-specific channel.
+        if (event.type === "provider/unhandled") {
+          bb.realtime.publish("codex/account/unhandled", event);
         }
       }
     } catch (err) {
@@ -509,7 +514,9 @@ export default async function plugin(bb: BbPluginApi) {
     if (prefix.startsWith("codex/thread/")) return ["thread"];
     if (prefix.startsWith("codex/turn/")) return ["turn"];
     if (prefix.startsWith("codex/item/")) return ["item"];
-    if (prefix.startsWith("codex/account/")) return ["account"];
+    if (prefix.startsWith("codex/account/") || prefix.startsWith("codex/raw/")) {
+      return ["account"];
+    }
     return CODEX_CATEGORIES;
   }
 
@@ -530,10 +537,20 @@ export default async function plugin(bb: BbPluginApi) {
 
     recent: (input) => {
       const { limit, threadId, typePrefix } = input;
+      const wanted = normaliseTypePrefix(typePrefix);
       const out: CodexEvent[] = [];
       for (const ring of walkRings({ threadId, typePrefix })) {
         for (let i = ring.events.length - 1; i >= 0; i -= 1) {
-          out.push(ring.events[i]!);
+          const event = ring.events[i]!;
+          const channel = eventToChannel(event.type, event.payload);
+          const matchesLegacyUnhandled =
+            event.type === "provider/unhandled" &&
+            wanted !== undefined &&
+            "codex/account/unhandled".startsWith(wanted);
+          if (wanted && !matchesLegacyUnhandled && (channel === null || !channel.startsWith(wanted))) {
+            continue;
+          }
+          out.push(event);
         }
       }
       out.sort((a, b) => b.seq - a.seq);
