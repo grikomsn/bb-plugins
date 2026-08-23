@@ -1,0 +1,31 @@
+{
+  "name": "bb-plugin-docker",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.39",
+    "bbPluginSdk": ">=0.4.8"
+  },
+  "bb": {
+    "name": "Docker",
+    "description": "Manage containers, images, volumes, and networks from the bb sidebar.",
+    "branding": {
+      "icon": "Container"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "host": "./host.ts",
+    "skills": [
+      "./skills"
+    ]
+  },
+  "private": true,
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build .",
+    "dev": "bb plugin dev ."
+  }
+}
