@@ -1,0 +1,40 @@
+{
+  "name": "bb-plugin-codex-live",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.39",
+    "bbPluginSdk": ">=0.4.8"
+  },
+  "bb": {
+    "name": "Codex Live",
+    "description": "Render codex reasoning deltas, command output, file-change diffs, MCP/tool progress, and background task updates as a streaming \"agent console\" while the bb builtin provider-codex host is generating them. Consumes codex/item/* delta events from bb-plugin-codex-events-bridge.",
+    "branding": {
+      "icon": "Activity"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "./skills"
+    ]
+  },
+  "private": true,
+  "dependencies": {
+    "@hugeicons/core-free-icons": "^4.1.3",
+    "@hugeicons/react": "^1.1.6",
+    "@radix-ui/react-slot": "^1.3.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.4.8"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build .",
+    "dev": "bb plugin dev .",
+    "test": "tsx lib/codex-live.test.ts && tsx server.test.ts"
+  }
+}
