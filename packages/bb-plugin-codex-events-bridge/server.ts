@@ -110,6 +110,7 @@ export const rpcContract = defineRpcContract({
         limit: z.number().int().min(1).max(500).optional().default(50),
         threadId: z.string().optional(),
         typePrefix: z.string().optional(),
+        afterSeq: z.number().int().nonnegative().optional(),
       })
       .strict(),
     output: z.object({
@@ -529,14 +530,18 @@ export default async function plugin(bb: BbPluginApi) {
     }),
 
     recent: (input) => {
-      const { limit, threadId, typePrefix } = input;
+      const { limit, threadId, typePrefix, afterSeq } = input;
       const out: CodexEvent[] = [];
       for (const ring of walkRings({ threadId, typePrefix })) {
-        for (let i = ring.events.length - 1; i >= 0; i -= 1) {
-          out.push(ring.events[i]!);
+        for (const event of ring.events) {
+          if (afterSeq !== undefined && event.seq <= afterSeq) continue;
+          out.push(event);
         }
       }
-      out.sort((a, b) => b.seq - a.seq);
+      // Cursor consumers need oldest-first pages so bursts larger than one
+      // response are drained without skipping their earliest events. Legacy
+      // callers without a cursor retain the newest-first replay behavior.
+      out.sort((a, b) => afterSeq === undefined ? b.seq - a.seq : a.seq - b.seq);
       return { events: out.slice(0, limit) };
     },
 
