@@ -1,0 +1,27 @@
+{
+  "name": "bb-plugin-codex-raw",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.39",
+    "bbPluginSdk": ">=0.4.8"
+  },
+  "bb": {
+    "name": "Codex Raw",
+    "description": "Diagnostic plugin that polls bb-plugin-codex-events-bridge's codex/raw channels, keeps per-thread raw-event rings, and exposes a settings table, payload inspection, RPC cursors, and bb codex-raw tail.",
+    "branding": {
+      "icon": "Activity"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "./skills"
+    ]
+  },
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build .",
+    "dev": "bb plugin dev ."
+  }
+}

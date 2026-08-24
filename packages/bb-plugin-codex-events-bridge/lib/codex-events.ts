@@ -100,7 +100,17 @@ export function typesForCategory(category: CodexCategory): readonly CodexType[] 
  * publish on. Both vectors live under `codex/<category>/<tail>` so
  * useRealtime and the rpc `typePrefix` filter both walk the same names.
  */
-export function eventToChannel(type: string): string | null {
+export function rawTypeFromPayload(payload: unknown): string | null {
+  if (payload === null || typeof payload !== "object") return null;
+  const rawType = (payload as Record<string, unknown>).rawType;
+  return typeof rawType === "string" && rawType.length > 0 ? rawType : null;
+}
+
+export function eventToChannel(type: string, payload?: unknown): string | null {
+  if (type === "provider/unhandled") {
+    const rawType = rawTypeFromPayload(payload);
+    return rawType === null ? "codex/raw/unknown" : `codex/raw/${rawType}`;
+  }
   const cat = categoryOf(type);
   if (cat === null) return null;
   if (cat === "account") {

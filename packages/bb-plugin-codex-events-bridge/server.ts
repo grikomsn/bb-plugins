@@ -323,9 +323,14 @@ export default async function plugin(bb: BbPluginApi) {
           payload: row.data,
         };
         recordEvent(state, event);
-        const channel = eventToChannel(event.type);
+        const channel = eventToChannel(event.type, event.payload);
         if (channel !== null) {
           bb.realtime.publish(channel, event);
+        }
+        // Preserve the original generic account channel for existing
+        // consumers while also exposing the rawType-specific channel.
+        if (event.type === "provider/unhandled") {
+          bb.realtime.publish("codex/account/unhandled", event);
         }
       }
     } catch (err) {
@@ -510,7 +515,9 @@ export default async function plugin(bb: BbPluginApi) {
     if (prefix.startsWith("codex/thread/")) return ["thread"];
     if (prefix.startsWith("codex/turn/")) return ["turn"];
     if (prefix.startsWith("codex/item/")) return ["item"];
-    if (prefix.startsWith("codex/account/")) return ["account"];
+    if (prefix.startsWith("codex/account/") || prefix.startsWith("codex/raw/")) {
+      return ["account"];
+    }
     return CODEX_CATEGORIES;
   }
 
@@ -531,10 +538,20 @@ export default async function plugin(bb: BbPluginApi) {
 
     recent: (input) => {
       const { limit, threadId, typePrefix, afterSeq } = input;
+      const wanted = normaliseTypePrefix(typePrefix);
       const out: CodexEvent[] = [];
       for (const ring of walkRings({ threadId, typePrefix })) {
         for (const event of ring.events) {
           if (afterSeq !== undefined && event.seq <= afterSeq) continue;
+          if (wanted) {
+            const channel = eventToChannel(event.type, event.payload);
+            const matchesLegacyUnhandled =
+              event.type === "provider/unhandled" &&
+              "codex/account/unhandled".startsWith(wanted);
+            if (!matchesLegacyUnhandled && (channel === null || !channel.startsWith(wanted))) {
+              continue;
+            }
+          }
           out.push(event);
         }
       }

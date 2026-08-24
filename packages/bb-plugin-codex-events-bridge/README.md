@@ -63,10 +63,11 @@ Per-event bb.realtime channels, one per SDK type:
   `item/mcpToolCall/progress`, `item/toolCall/progress`,
   `item/backgroundTask/progress`, `item/backgroundTask/completed`
 - `codex/account/<event>` — `provider/error`, `provider/rateLimits/updated`,
-  `provider/warning`, `provider/modelFallback`, `provider/unhandled` (the
-  SDK uses `provider/*` for these; the bridge renames the channel to
-  `account/*` so downstream filters don't depend on internal provider
-  namespaces)
+  `provider/warning`, and `provider/modelFallback` (the SDK uses
+  `provider/*`; the bridge renames these channels to `account/*`).
+- `codex/raw/<rawType>` — `provider/unhandled` rows, preserving the original
+  Codex JSON-RPC method in the channel and full row payload in the event. The
+  legacy generic `codex/account/unhandled` channel remains published too.
 
 The `useRealtime("<channel>", handler)` hook receives event payloads
 with shape:
@@ -207,7 +208,8 @@ threads on overlapping cadences. The bridge:
 - Multi-provider generalization — channel names start with `codex/...`
   for v1; refactor to `provider/<providerId>/...` when a second
   consumer needs it.
-- The 42 noise/unknown codex events — deferred to a `bb-plugin-codex-raw`.
+- Type-specific rendering of the 42 noise/unknown Codex notifications; that
+  belongs to `bb-plugin-codex-raw`.
 - Backpressure / dedup beyond the seq watermark.
 - Cross-thread aggregation — per-thread is enough for v1.
 
