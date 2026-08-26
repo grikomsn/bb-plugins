@@ -21,6 +21,7 @@ bb-plugins/
     ├── bb-plugin-pi-subagents-fleet/
     ├── bb-plugin-pi-codex-goal/
     ├── bb-plugin-mcp-mediator/
+    ├── bb-plugin-workspaces/      multi-root workspace aggregator
     └── pi-bb-bridge/               pi-side companion extension
 ```
 
